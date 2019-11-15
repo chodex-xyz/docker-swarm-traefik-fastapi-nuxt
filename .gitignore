@@ -1,3 +1,4 @@
 .idea
 backend/venv
+backend/__pychahe__
 letsencrypt/acme.json
