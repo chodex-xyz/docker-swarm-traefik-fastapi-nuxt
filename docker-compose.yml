@@ -2,6 +2,10 @@ version: "3.7"
 
 services:
   backend:
-    image: docker.pkg.github.com/kcrebound/smena-hackathon/backend:0.1
+    image: docker.pkg.github.com/kcrebound/smena-hackathon/hbackend:0.1
     ports:
       - "8000:8000"
+  frontend:
+    image: docker.pkg.github.com/kcrebound/smena-hackathon/hfrontend:0.1
+    ports:
+      - "3000:3000"
