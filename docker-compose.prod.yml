@@ -1,0 +1,61 @@
+version: "3.7"
+
+services:
+  backend:
+    image: docker.pkg.github.com/kcrebound/smena-hackathon/hbackend:0.1
+    deploy:
+      replicas: 2
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.backend.rule=Host(`api.localhost`)"
+        - "traefik.http.routers.backend.entrypoints=web"
+        - "traefik.http.services.backend-service.loadbalancer.server.port=8000"
+    networks:
+      - traefik-public
+  frontend:
+    image: docker.pkg.github.com/kcrebound/smena-hackathon/hfrontend:0.1
+    deploy:
+      replicas: 2
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.frontend.rule=Host(`localhost`)"
+        - "traefik.http.routers.frontend.entrypoints=web"
+        - "traefik.http.services.frontend-service.loadbalancer.server.port=3000"
+#        - "traefik.http.routers.frontend.entrypoints=websecure"
+#        - "traefik.http.routers.frontend.tls.certresolver=myhttpchallenge"
+    networks:
+      - traefik-public
+
+  traefik:
+    image: traefik:v2.0.4
+    command:
+      #- "--log.level=DEBUG"
+      - "--api.insecure=true"
+      - "--providers.docker.swarmMode=true"
+      - "--providers.docker.endpoint=unix:///var/run/docker.sock"
+      - "--providers.docker.exposedbydefault=false"
+      - "--providers.docker.network=traefik-public"
+      - "--entrypoints.web.address=:80"
+      - "--entryPoints.websecure.address=:443"
+      - "--certificatesresolvers.le.acme.httpchallenge=true"
+      - "--certificatesresolvers.le.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.le.acme.email=testmail@gmail.lol"
+      - "--certificatesresolvers.le.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "80:80"
+      - "8080:8080"
+      - "443:443"
+    networks:
+      - traefik-public
+    volumes:
+      - "./letsencrypt:/letsencrypt"
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    deploy:
+      placement:
+        # because we need store le
+        constraints:
+          - node.role == manager
+
+networks:
+  traefik-public:
+    external: true
