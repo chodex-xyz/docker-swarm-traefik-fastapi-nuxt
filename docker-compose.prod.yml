@@ -7,11 +7,18 @@ services:
       replicas: 8
       labels:
         - "traefik.enable=true"
+        # redirect to https
+        - "traefik.http.routers.frontend-http.rule=Host(`farfor.tech`)"
+        - "traefik.http.routers.frontend-http.entrypoints=web"
+        - "traefik.http.routers.frontend-http.middlewares=redirect-to-https"
+        # middleware redirect
+        - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+
+        # https
         - "traefik.http.routers.frontend.rule=Host(`farfor.tech`)"
-        - "traefik.http.services.frontend-service.loadbalancer.server.port=3000"
-        - "traefik.http.routers.frontend.entrypoints=web"
         - "traefik.http.routers.frontend.entrypoints=websecure"
         - "traefik.http.routers.frontend.tls.certresolver=letsencrypt"
+        - "traefik.http.services.frontend-service.loadbalancer.server.port=3000"
       placement:
         constraints:
           - node.role == worker
@@ -27,9 +34,16 @@ services:
           - node.role == worker
       labels:
         - "traefik.enable=true"
+        # redirect to https
+        - "traefik.http.routers.backend-http.rule=Host(`api.farfor.tech`)"
+        - "traefik.http.routers.backend-http.entrypoints=web"
+        - "traefik.http.routers.backend-http.middlewares=redirect-to-https"
+        # middleware redirect
+        - "traefik.http.middlewares.redirect-to-https.redirectscheme.scheme=https"
+
+        # https
         - "traefik.http.routers.backend.rule=Host(`api.farfor.tech`)"
         - "traefik.http.services.backend-service.loadbalancer.server.port=8000"
-        - "traefik.http.routers.backend.entrypoints=web"
         - "traefik.http.routers.backend.entrypoints=websecure"
         - "traefik.http.routers.backend.tls.certresolver=letsencrypt"
     networks:
