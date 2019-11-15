@@ -11,7 +11,7 @@ services:
         - "traefik.http.routers.backend.entrypoints=web"
         - "traefik.http.services.backend-service.loadbalancer.server.port=8000"
     networks:
-      - traefik-public
+      - inbound
   frontend:
     image: docker.pkg.github.com/kcrebound/smena-hackathon/hfrontend:0.1
     deploy:
@@ -22,7 +22,7 @@ services:
         - "traefik.http.routers.frontend.entrypoints=web"
         - "traefik.http.services.frontend-service.loadbalancer.server.port=3000"
     networks:
-      - traefik-public
+      - inbound
 
   traefik:
     image: traefik:v2.0.4
@@ -32,19 +32,23 @@ services:
       - "--providers.docker.swarmMode=true"
       - "--providers.docker.endpoint=unix:///var/run/docker.sock"
       - "--providers.docker.exposedbydefault=false"
-      - "--providers.docker.network=traefik-public"
+      - "--providers.docker.network=traefik"
       - "--entrypoints.web.address=:80"
       - "--entryPoints.websecure.address=:443"
       - "--certificatesresolvers.le.acme.httpchallenge=true"
       - "--certificatesresolvers.le.acme.httpchallenge.entrypoint=web"
       - "--certificatesresolvers.le.acme.email=testmail@gmail.lol"
       - "--certificatesresolvers.le.acme.storage=/letsencrypt/acme.json"
+
+      - "--metrics.prometheus=true"
+      - "--metrics.prometheus.buckets=0.1,0.3,1.2,5.0"
     ports:
       - "80:80"
       - "8080:8080"
       - "443:443"
     networks:
-      - traefik-public
+      - traefik
+      - inbound
     volumes:
       - "./letsencrypt:/letsencrypt"
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
@@ -54,6 +58,64 @@ services:
         constraints:
           - node.role == manager
 
+  prometheus:
+    image: prom/prometheus
+    volumes:
+      - ./prometheus/:/etc/prometheus/
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    networks:
+      - inbound
+    deploy:
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.prometheus.rule=Host(`prometheus.localhost`)"
+        - "traefik.http.routers.prometheus.entrypoints=web"
+        - "traefik.http.services.prometheus-service.loadbalancer.server.port=9090"
+        - "traefik.docker.network=inbound"
+      placement:
+        constraints:
+          - node.role==manager
+      restart_policy:
+        condition: on-failure
+
+  grafana:
+    image: grafana/grafana
+    depends_on:
+      - prometheus
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning/:/etc/grafana/provisioning/
+    env_file:
+      - ./grafana/config.monitoring
+    networks:
+      - inbound
+    user: "104"
+    deploy:
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.grafana.rule=Host(`grafana.localhost`)"
+        - "traefik.http.routers.grafana.entrypoints=web"
+        - "traefik.http.services.grafana-service.loadbalancer.server.port=3000"
+        - "traefik.docker.network=inbound"
+      placement:
+        constraints:
+          - node.role == manager
+      restart_policy:
+        condition: on-failure
+
 networks:
-  traefik-public:
-    external: true
+  traefik:
+    driver: overlay
+    name: traefik
+  inbound:
+    driver: overlay
+    name: inbound
+
+volumes:
+    prometheus_data: {}
+    grafana_data: {}
