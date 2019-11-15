@@ -1,18 +1,6 @@
 version: "3.7"
 
 services:
-  backend:
-    image: docker.pkg.github.com/kcrebound/smena-hackathon/hbackend:0.1
-    deploy:
-      replicas: 20
-      labels:
-        - "traefik.enable=true"
-        - "traefik.http.routers.backend.rule=Host(`api.farfor.tech`)"
-        - "traefik.http.services.backend-service.loadbalancer.server.port=8000"
-        - "traefik.http.routers.frontend.entrypoints=websecure"
-        - "traefik.http.routers.frontend.tls.certresolver=le"
-    networks:
-      - traefik-public
   frontend:
     image: docker.pkg.github.com/kcrebound/smena-hackathon/hfrontend:0.1
     deploy:
@@ -21,15 +9,35 @@ services:
         - "traefik.enable=true"
         - "traefik.http.routers.frontend.rule=Host(`farfor.tech`)"
         - "traefik.http.services.frontend-service.loadbalancer.server.port=3000"
+        - "traefik.http.routers.frontend.entrypoints=web"
         - "traefik.http.routers.frontend.entrypoints=websecure"
-        - "traefik.http.routers.frontend.tls.certresolver=le"
+        - "traefik.http.routers.frontend.tls.certresolver=letsencrypt"
+      placement:
+        constraints:
+          - node.role == worker
+    networks:
+      - traefik-public
+
+  backend:
+    image: docker.pkg.github.com/kcrebound/smena-hackathon/hbackend:0.1
+    deploy:
+      replicas: 20
+      placement:
+        constraints:
+          - node.role == worker
+      labels:
+        - "traefik.enable=true"
+        - "traefik.http.routers.backend.rule=Host(`api.farfor.tech`)"
+        - "traefik.http.services.backend-service.loadbalancer.server.port=8000"
+        - "traefik.http.routers.backend.entrypoints=web"
+        - "traefik.http.routers.backend.entrypoints=websecure"
+        - "traefik.http.routers.backend.tls.certresolver=letsencrypt"
     networks:
       - traefik-public
 
   traefik:
     image: traefik:v2.0.4
     command:
-      #- "--log.level=DEBUG"
       - "--api.insecure=true"
       - "--providers.docker.swarmMode=true"
       - "--providers.docker.endpoint=unix:///var/run/docker.sock"
@@ -37,10 +45,10 @@ services:
       - "--providers.docker.network=traefik-public"
       - "--entrypoints.web.address=:80"
       - "--entryPoints.websecure.address=:443"
-      - "--certificatesresolvers.le.acme.httpchallenge=true"
-      - "--certificatesresolvers.le.acme.httpchallenge.entrypoint=web"
-      - "--certificatesresolvers.le.acme.email=testmail@farfor.tech"
-      - "--certificatesresolvers.le.acme.storage=/letsencrypt/acme.json"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge=true"
+      - "--certificatesresolvers.letsencrypt.acme.httpchallenge.entrypoint=web"
+      - "--certificatesresolvers.letsencrypt.acme.email=testmail@farfor.tech"
+      - "--certificatesresolvers.letsencrypt.acme.storage=/letsencrypt/acme.json"
     ports:
       - "80:80"
       - "8080:8080"
@@ -52,7 +60,6 @@ services:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
     deploy:
       placement:
-        # because we need store le
         constraints:
           - node.role == manager
 
